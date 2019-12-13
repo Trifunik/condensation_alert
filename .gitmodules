@@ -1,0 +1,6 @@
+[submodule "microCoAPy"]
+	path = microCoAPy
+	url = https://github.com/insighio/microCoAPy.git
+[submodule "micropython-dht12"]
+	path = micropython-dht12
+	url = https://github.com/mcauser/micropython-dht12.git

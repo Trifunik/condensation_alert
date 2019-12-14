@@ -5,8 +5,11 @@ Used Libraries:
 
 *) microCoAPy --> https://github.com/insighio/microCoAPy.git
 
+	- just the microcoapy.py is used
+
 *) micropython-dht12 --> https://github.com/mcauser/micropython-dht12.git
 
+	- just the dht12.py is used
 
 These libs are submodules do not forget to use:
 
@@ -17,3 +20,4 @@ and
 	git submodule update
 
 after you cloned this repo.
+

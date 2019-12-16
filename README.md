@@ -21,3 +21,6 @@ and
 
 after you cloned this repo.
 
+NOTE:
+
+network_info is a python script which contains  the ssid, the password and the IP-adress of the Node-RED server.

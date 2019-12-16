@@ -5,6 +5,10 @@ import network
 import network_info
 from machine import I2C, Pin
 
+# --- init pins for debugging ---
+led = Pin(10, Pin.OUT)
+button = Pin(39, Pin.IN)
+
 # --- init variales  ---
 current_time = 0
 divisor = 0
@@ -81,46 +85,57 @@ def convertAndSendData(client):
 	global data_list
 
 	idx = 0
-	while idx < 8:
+	while idx < divisor:
 		putData(client, str(int(data_list[idx][0]))+","+str(int(data_list[idx][1]))+","+str(int(data_list[idx][2])))
 		idx+=1
 
-do_connect()
-# Starting CoAP...
-client.start()
-# get current time
-client.resposeCallback = receivedCurrentTimeCallback
-getTime(client)
+while True:
+	
+# Debugging
+	for x in range(5):
+		led.value(0)
+		time.sleep(0.3)
+		led.value(1)
+		time.sleep(0.3)
 
-# get divisor
-client.resposeCallback = receivedDivisorCallback
-getDivisor(client)
+	do_connect()
+	# Starting CoAP...
+	client.start()
+	# get current time
+	client.resposeCallback = receivedCurrentTimeCallback
+	getTime(client)
 
-# stop CoAP
-client.stop()
+	# get divisor
+	client.resposeCallback = receivedDivisorCallback
+	getDivisor(client)
 
-do_disconnect()
+	# stop CoAP
+	client.stop()
 
-# --- Measuremet
-time_diff = int(86400/ divisor)
+	do_disconnect()
 
-idx = 0
-while idx < 10: # DEBUGGING
-	sensor.measure()
-	data_list.append([current_time+time_diff*idx, sensor.temperature(), sensor.humidity()])
-	time.sleep(1)
-	idx+=1
+	# --- Measuremet
+	time_diff = int(86400/ divisor)
 
-do_connect()
-# Starting CoAP...
-client.start()
+	idx = 0
+	while idx < divisor:
+		sensor.measure()
+		data_list.append([current_time+time_diff*idx, sensor.temperature(), sensor.humidity()])
+		led.value(0)
+		time.sleep(0.3)
+		led.value(1)
+		time.sleep(0.3)
+		time.sleep(time_diff)
+		idx+=1
 
-client.resposeCallback = receivedMessageCallback
-convertAndSendData(client)
+	do_connect()
+	# Starting CoAP...
+	client.start()
 
-# stop CoAP
-client.stop()
-do_disconnect()
+	client.resposeCallback = receivedMessageCallback
+	convertAndSendData(client)
 
-
-
+	# stop CoAP
+	client.stop()
+	do_disconnect()
+	data_list.clear()

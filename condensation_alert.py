@@ -88,9 +88,24 @@ def convertAndSendData(client):
 	while idx < divisor:
 		putData(client, str(int(data_list[idx][0]))+","+str(int(data_list[idx][1]))+","+str(int(data_list[idx][2])))
 		idx+=1
+		
+		
+def doMeasure(timeStamp):
+	global data_list
+	global sensor
+
+	try:
+		sensor.measure()
+		data_list.append([timeStamp, sensor.temperature(), sensor.humidity()])
+	except:
+		print("MEASURE ERROR", timeStamp)
+		data_list.append([timeStamp, 0.0, 0.0])
+	finally:
+		return
+
 
 while True:
-	
+	print(" --- MAIN LOOP --- ")
 # Debugging
 	for x in range(5):
 		led.value(0)
@@ -115,12 +130,12 @@ while True:
 	do_disconnect()
 
 	# --- Measuremet
-	time_diff = int(86400/ divisor)
+	time_diff = int(360/ divisor)
 
 	idx = 0
 	while idx < divisor:
-		sensor.measure()
-		data_list.append([current_time+time_diff*idx, sensor.temperature(), sensor.humidity()])
+		print("measure ", idx)
+		doMeasure(current_time+time_diff*idx)
 		led.value(0)
 		time.sleep(0.3)
 		led.value(1)

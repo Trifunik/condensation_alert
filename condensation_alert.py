@@ -3,17 +3,17 @@ import dht12
 import microcoapy.microcoapy
 import network
 import network_info
-from machine import I2C, Pin
+import machine
 
-# --- init pins for debugging ---
+I2C = machine.I2C
+Pin = machine.Pin
+
+# --- init pins  ---
 led = Pin(10, Pin.OUT)
-button = Pin(39, Pin.IN)
 
 # --- init variales  ---
-payload_tmp = 0
 current_time = 0
 divisor = 24
-last_divisor = divisor
 data_list = []
 last_temp = 0.0
 last_hum = 0.0
@@ -72,11 +72,6 @@ def getDivisor(client):
 	bytesTransferred = client.get(_SERVER_IP, _SERVER_PORT, COAP_DIVISOR, b'\x10')
 	client.poll(4000)
 
-def receivedDivisorCallback(packet, sender):
-	print(packet.payload)
-	global divisor 
-	divisor = int(packet.payload)
-
 # -- send data --
 def putData(client, data):
 	print("data: ", data)
@@ -97,7 +92,7 @@ def convertAndSendData(client):
 	while idx < divisor:
 		putData(client, str(int(data_list[idx][0]))+","+str(int(data_list[idx][1]))+","+str(int(data_list[idx][2])))
 		idx+=1
-	
+
 	del data_list[:]
 		
 def doMeasure(timeStamp):
@@ -116,16 +111,17 @@ def doMeasure(timeStamp):
 		data_list.append([timeStamp, last_temp, last_hum])
 		return
 
+# Programm started
+for x in range(5):
+	led.value(0)
+	time.sleep(0.3)
+	led.value(1)
+	time.sleep(0.3)
 
+# protection against leaking current
+led = Pin(10, Pin.IN, Pin.PULL_HOLD)
+	
 while True:
-	print(" --- MAIN LOOP --- ")
-# Debugging
-	for x in range(5):
-		led.value(0)
-		time.sleep(0.3)
-		led.value(1)
-		time.sleep(0.3)
-
 	do_connect()
 	# Starting CoAP...
 	client.start()
@@ -140,24 +136,14 @@ while True:
 	client.stop()
 
 	do_disconnect()
-	
-	print(" -- DEBUG --- ")
-	print("Time: ", current_time)
-	print("Divisor: ", divisor)
-	
 
 	# --- Measuremet
-	time_diff = int(360/ divisor)
+	time_diff = int(86400/ divisor)
 
 	idx = 0
 	while idx < divisor:
-		print("measure ", idx)
 		doMeasure(current_time+time_diff*idx)
-		led.value(0)
-		time.sleep(0.3)
-		led.value(1)
-		time.sleep(0.3)
-		time.sleep(time_diff)
+		machine.lightsleep(time_diff * 1000)
 		idx+=1
 
 	do_connect()

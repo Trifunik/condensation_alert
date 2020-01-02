@@ -1,6 +1,6 @@
 import time
 import dht12
-import microcoapy
+import microcoapy.microcoapy
 import network
 import network_info
 from machine import I2C, Pin
@@ -10,9 +10,13 @@ led = Pin(10, Pin.OUT)
 button = Pin(39, Pin.IN)
 
 # --- init variales  ---
+payload_tmp = 0
 current_time = 0
-divisor = 0
+divisor = 24
+last_divisor = divisor
 data_list = []
+last_temp = 0.0
+last_hum = 0.0
 
 wlan = network.WLAN(network.STA_IF)
 client = microcoapy.Coap()
@@ -49,19 +53,24 @@ def do_disconnect():
 # --- CoAP functions --- 
 #  -- Time --
 def getTime(client):
-	bytesTransferred = client.get(_SERVER_IP, _SERVER_PORT, COAP_TIME)
-	client.poll(2000)
+	bytesTransferred = client.get(_SERVER_IP, _SERVER_PORT, COAP_TIME, b'\x20')
+	client.poll(4000)
 
-def receivedCurrentTimeCallback(packet, sender):
+def receivedGetCallback(packet, sender):
 	print('Message received:', packet, ', from: ', sender)
 	print(packet.payload)
-	global current_time 
-	current_time = int(packet.payload)
+	global current_time
+	global divisor
+	
+	if packet.token == b'\x10':
+		divisor = int(packet.payload)
+	elif packet.token == b'\x20':
+		current_time = int(packet.payload)
 
-#  -- Divisor --
+#  -- Divisor --s
 def getDivisor(client):
-	bytesTransferred = client.get(_SERVER_IP, _SERVER_PORT, COAP_DIVISOR)
-	client.poll(2000)
+	bytesTransferred = client.get(_SERVER_IP, _SERVER_PORT, COAP_DIVISOR, b'\x10')
+	client.poll(4000)
 
 def receivedDivisorCallback(packet, sender):
 	print(packet.payload)
@@ -72,10 +81,10 @@ def receivedDivisorCallback(packet, sender):
 def putData(client, data):
 	print("data: ", data)
 	# About to post message...
-	bytesTransferred = client.put(_SERVER_IP, _SERVER_PORT, COAP_DATA, data, None, microcoapy.COAP_CONTENT_TYPE.COAP_TEXT_PLAIN)
+	bytesTransferred = client.put(_SERVER_IP, _SERVER_PORT, COAP_DATA, data, None, microcoapy.COAP_CONTENT_FORMAT.COAP_TEXT_PLAIN)
 	print("[PUT] Sent bytes: ", bytesTransferred)
 	# wait for respose to our request for 2 seconds
-	client.poll(2000)
+	client.poll(4000)
 
 def receivedMessageCallback(packet, sender):
 		print('Message received:', packet, ', from: ', sender)
@@ -88,19 +97,23 @@ def convertAndSendData(client):
 	while idx < divisor:
 		putData(client, str(int(data_list[idx][0]))+","+str(int(data_list[idx][1]))+","+str(int(data_list[idx][2])))
 		idx+=1
-		
+	
+	del data_list[:]
 		
 def doMeasure(timeStamp):
 	global data_list
 	global sensor
+	global last_hum
+	global last_temp
 
 	try:
 		sensor.measure()
-		data_list.append([timeStamp, sensor.temperature(), sensor.humidity()])
+		last_hum = sensor.humidity()
+		last_temp = sensor.temperature()
 	except:
 		print("MEASURE ERROR", timeStamp)
-		data_list.append([timeStamp, 0.0, 0.0])
 	finally:
+		data_list.append([timeStamp, last_temp, last_hum])
 		return
 
 
@@ -117,17 +130,21 @@ while True:
 	# Starting CoAP...
 	client.start()
 	# get current time
-	client.resposeCallback = receivedCurrentTimeCallback
+	client.resposeCallback = receivedGetCallback
 	getTime(client)
 
 	# get divisor
-	client.resposeCallback = receivedDivisorCallback
 	getDivisor(client)
 
 	# stop CoAP
 	client.stop()
 
 	do_disconnect()
+	
+	print(" -- DEBUG --- ")
+	print("Time: ", current_time)
+	print("Divisor: ", divisor)
+	
 
 	# --- Measuremet
 	time_diff = int(360/ divisor)
@@ -153,4 +170,3 @@ while True:
 	# stop CoAP
 	client.stop()
 	do_disconnect()
-	data_list.clear()

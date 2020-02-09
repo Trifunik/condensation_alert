@@ -30,6 +30,8 @@ COAP_DIVISOR = '/divisor'
 COAP_DATA = '/data'
 
 i2c = I2C(scl=Pin(26), sda=Pin(0))
+i2c_axp = I2C(scl=Pin(22), sda=Pin(21), freq=400000)
+
 sensor = dht12.DHT12(i2c)
 
 # --- define functions ---
@@ -47,8 +49,7 @@ def do_connect():
 def do_disconnect():
 	global wlan
 	wlan.disconnect()
-	wlan.active(True)
-	
+	wlan.active(False)
 
 # --- CoAP functions --- 
 #  -- Time --
@@ -64,8 +65,10 @@ def receivedGetCallback(packet, sender):
 	
 	if packet.token == b'\x10':
 		divisor = int(packet.payload)
+		print('DEBUG: divisor = ', divisor)
 	elif packet.token == b'\x20':
 		current_time = int(packet.payload)
+		print('DEBUG: current_time = ', current_time)
 
 #  -- Divisor --s
 def getDivisor(client):
@@ -105,23 +108,34 @@ def doMeasure(timeStamp):
 		sensor.measure()
 		last_hum = sensor.humidity()
 		last_temp = sensor.temperature()
+		print("MEASURE TRY @ t=", timeStamp)
+		time.sleep(5)
 	except:
 		print("MEASURE ERROR", timeStamp)
+		time.sleep(5)
 	finally:
 		data_list.append([timeStamp, last_temp, last_hum])
 		return
 
 # Programm started
+print("DEBUG: Programm started")
 for x in range(5):
 	led.value(0)
 	time.sleep(0.3)
 	led.value(1)
 	time.sleep(0.3)
 
+# --- Power Saving Mode
 # protection against leaking current
 led = Pin(10, Pin.IN, Pin.PULL_HOLD)
-	
+# turn off all posible modules on the M5StickC
+# turn off LDO3(TFT) & LDO2(Black LED) @ AXP192
+i2c_axp.writeto_mem(0x34,0x12,b'\x11')
+# turn off LDOio (GPIO0/ MIC)
+i2c_axp.writeto_mem(0x34,0x90,b'x00')
+
 while True:
+	print("DEBUG: MAIN-Loop")
 	do_connect()
 	# Starting CoAP...
 	client.start()
@@ -135,14 +149,20 @@ while True:
 	# stop CoAP
 	client.stop()
 
+	print("DEBUG: do_disconnect")
+	time.sleep(5)
 	do_disconnect()
+	time.sleep(5)
 
 	# --- Measuremet
 	time_diff = int(86400/ divisor)
+	print("DEBUG: time_diff = ", time_diff)
+	time.sleep(5)
 
 	idx = 0
 	while idx < divisor:
 		doMeasure(current_time+time_diff*idx)
+		time.sleep(5)
 		machine.lightsleep(time_diff * 1000)
 		idx+=1
 
